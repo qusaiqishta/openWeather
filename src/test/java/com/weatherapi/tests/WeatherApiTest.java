@@ -38,13 +38,21 @@ public class WeatherApiTest {
         RestAssured.baseURI = TestConfig.BASE_URL;
     }
 
+    private Response getWeatherResponse(String city) {
+        return getWeatherResponseWithApiKey(city, TestConfig.API_KEY);
+    }
+
+    private Response getWeatherResponseWithApiKey(String city, String apiKey) {
+        return given()
+            .queryParam("q", city)
+            .queryParam("appid", apiKey)
+        .when()
+            .get("/weather");
+    }
+
     @Test
     public void testGetWeatherForLondon() {
-        given()
-            .queryParam("q", "London")
-            .queryParam("appid", TestConfig.API_KEY)
-        .when()
-            .get("/weather")
+        getWeatherResponse("London")
         .then()
             .statusCode(200)
             .contentType(ContentType.JSON)
@@ -56,11 +64,7 @@ public class WeatherApiTest {
 
     @Test
     public void testWeatherSchemaValidation() {
-        given()
-            .queryParam("q", "London")
-            .queryParam("appid", TestConfig.API_KEY)
-        .when()
-            .get("/weather")
+        getWeatherResponse("London")
         .then()
             .assertThat()
             .body(matchesJsonSchemaInClasspath(TestConfig.WEATHER_SCHEMA_PATH));
@@ -68,68 +72,49 @@ public class WeatherApiTest {
 
     @Test
     public void testResponseTime() {
-        given()
-            .queryParam("q", "London")
-            .queryParam("appid", TestConfig.API_KEY)
-        .when()
-            .get("/weather")
+        getWeatherResponse("London")
         .then()
             .time(lessThan(2000L)); // Response should be less than 2 seconds
     }
 
     @Test
     public void testInvalidApiKey() {
-        given()
-            .queryParam("q", "London")
-            .queryParam("appid", "invalid_key")
-        .when()
-            .get("/weather")
+        getWeatherResponseWithApiKey("London", "INVALID_KEY")
         .then()
             .statusCode(401);
     }
 
     @Test
     public void testInvalidCity() {
-        given()
-            .queryParam("q", "NonExistentCity123456")
-            .queryParam("appid", TestConfig.API_KEY)
-        .when()
-            .get("/weather")
+        getWeatherResponse("InvalidCity")
         .then()
             .statusCode(404);
     }
 
     @Test
     public void testWeatherDataValues() {
-        Response response = given()
-            .queryParam("q", "London")
-            .queryParam("appid", TestConfig.API_KEY)
-        .when()
-            .get("/weather")
-        .then()
-            .statusCode(200)
-            .extract().response();
+        Response response = getWeatherResponse("London");
+        response.then()
+            .body("main.temp", notNullValue())
+            .body("main.pressure", notNullValue())
+            .body("main.humidity", notNullValue());
 
         // Verify temperature is within reasonable range (-100 to +100 Celsius)
         float temp = response.path("main.temp");
         assert temp > 173.15 && temp < 373.15; // Kelvin range
 
-        // Verify humidity is between 0 and 100
-        int humidity = response.path("main.humidity");
-        assert humidity >= 0 && humidity <= 100;
-
         // Verify pressure is within reasonable range
         int pressure = response.path("main.pressure");
         assert pressure > 870 && pressure < 1085; // hPa range
+
+        // Verify humidity is between 0 and 100
+        int humidity = response.path("main.humidity");
+        assert humidity >= 0 && humidity <= 100;
     }
 
     @Test
     public void testAllFieldsPresent() {
-        given()
-            .queryParam("q", "London")
-            .queryParam("appid", TestConfig.API_KEY)
-        .when()
-            .get("/weather")
+        getWeatherResponse("London")
         .then()
             .body("main.feels_like", notNullValue())
             .body("main.temp_min", notNullValue())

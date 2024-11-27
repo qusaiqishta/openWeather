@@ -34,7 +34,3 @@ mvn test
 ```
 
 This will run all the test cases defined in the project, validating the API responses against the defined schema and expected values.
-
-## License
-
-This project is licensed under the MIT License.
